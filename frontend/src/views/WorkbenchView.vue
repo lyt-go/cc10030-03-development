@@ -6,6 +6,14 @@
         <p class="page-desc">{{ meta.desc }}</p>
       </div>
       <div class="page-actions">
+        <RouterLink
+          v-if="meta.key === 'region_dim' || meta.key === 'density_estimate'"
+          class="btn"
+          data-testid="open-region-density"
+          to="/region_density"
+        >
+          区域密度贡献
+        </RouterLink>
         <button class="btn primary" data-testid="open-create" type="button" @click="openCreate">
           登记{{ meta.entity }}
         </button>

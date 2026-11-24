@@ -11,12 +11,15 @@
 .
 ├── frontend/                 Vue 3 + Vite + TypeScript 前端
 │   ├── src/views/WorkbenchView.vue|tsx  全部模块共享工作台
+│   ├── src/views/RegionDensityView.vue  区域密度贡献专题页
 │   ├── src/data/modules.ts              18个业务模块配置
 │   ├── src/api/              统一请求封装
 │   └── vite.config.ts        dev server 配置（open: false）
 ├── backend/                  FastAPI（Python） 后端
 │   ├── app/routers/resource.py  通用查询/导出/登记/动作接口
+│   ├── app/routers/region_density.py  区域密度看板、带宽对照与对照审批接口
 │   ├── app/services/<key>.py    每个模块独立领域逻辑
+│   ├── app/services/geo_density.py  网格几何、核贡献与子区归属的共享纯函数
 │   ├── app/services/base.py     共享服务骨架
 │   └── app/store.py          内存数据仓库与示例数据
 ├── .gitignore
@@ -76,6 +79,40 @@ npm run dev
   `frontend/src/domain/<模块>.ts`，用于承载真实业务差异并维持36题位容量。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
+- 区域密度与审批走固定接口 `/api/region_dim/*`，不占用通用资源路由。
+
+## 区域密度贡献
+
+区域维度除维护层级外，还提供按上级区域汇总的密度贡献视图：
+
+- 网格按 geohash 几何中心计算核贡献，逐格分为**有落点**、**仅有核贡献**
+  （相邻格扩散）与**确为零**（所有来源点都在带宽外，属于待补采缺口）。
+- 子区归属按网格与边界的**交叠面积唯一确定**，跨区网格整格只计入一个子区，
+  父区域样本合计始终回对同一批定位点；每块子区列出采用点、网格、带宽与样本量。
+- 每次**对照审批**都会把实际采用的网格集合、输入快照和逐格结果写入
+  `data/region_approvals/`；确认后仍可按当天快照复算，`use_current_inputs=true`
+  才改用当前输入并显式列出差异。
+- 迟到定位点必须经 `POST /api/region_dim/approvals/{id}/late-points`
+  **独立通过位置核验**才会进入已核验输入；审批打开后不会被自动改写。
+  确认时可选择「历史对账」（按旧观测完成核对）或「更正补采」
+  （只采用已核验的更正点，并重新登记补采任务）。
+- 区域估算只接受坐标标准化后的已核验定位点；只有原始采集点的批次会被拒绝。
+
+常用接口：
+
+| 接口 | 用途 |
+| --- | --- |
+| `GET /api/region_dim/hierarchy` | 父区域与子区边界 |
+| `GET /api/region_dim/density-board` | 三类格分列、各子区采用点 |
+| `GET /api/region_dim/density-view` | 按上级区域汇总的密度贡献 |
+| `GET /api/region_dim/bandwidth-compare` | 两种带宽对照（同一批点） |
+| `POST /api/region_dim/approvals` | 打开对照审批（冻结网格与结果） |
+| `GET /api/region_dim/approvals/{id}/replay` | 按审批快照复算旧合计 |
+| `GET /api/region_dim/approvals/{id}/reconcile` | 与更早审批做历史对账 |
+| `POST /api/region_dim/demo-batch` | 生成横跨两个子区的演示批次 |
+
+前端专题页：`http://127.0.0.1:5173/region_density`，也可从「区域维度」「密度估算」
+模块页右上角的「区域密度贡献」进入。
 
 领域：数据工程
 子方向：数据分析与数据应用

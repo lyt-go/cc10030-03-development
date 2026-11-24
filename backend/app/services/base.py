@@ -194,36 +194,14 @@ class BaseModuleService:
 
     @staticmethod
     def _geohash_encode(lat: float, lon: float, precision: int = 8) -> str:
-        """将经纬度编码为指定精度的geohash字符串，用于网格索引生成。"""
-        base32 = "0123456789bcdefghjkmnpqrstuvwxyz"
-        lat_range = (-90.0, 90.0)
-        lon_range = (-180.0, 180.0)
-        is_even = True
-        bit = 0
-        ch = 0
-        geohash = ""
-        while len(geohash) < precision:
-            if is_even:
-                mid = (lon_range[0] + lon_range[1]) / 2
-                if lon >= mid:
-                    ch |= 1 << (4 - bit)
-                    lon_range = (mid, lon_range[1])
-                else:
-                    lon_range = (lon_range[0], mid)
-            else:
-                mid = (lat_range[0] + lat_range[1]) / 2
-                if lat >= mid:
-                    ch |= 1 << (4 - bit)
-                    lat_range = (mid, lat_range[1])
-                else:
-                    lat_range = (lat_range[0], mid)
-            is_even = not is_even
-            bit += 1
-            if bit == 5:
-                geohash += base32[ch]
-                bit = 0
-                ch = 0
-        return geohash
+        """将经纬度编码为指定精度的geohash字符串，用于网格索引生成。
+
+        统一委托给区域密度核心，保证网格索引、密度估算和区域汇总使用同一套
+        geohash 编码，避免各模块各写一份后边界单元格对不上。
+        """
+        from app.services.geo_density import geohash_encode
+
+        return geohash_encode(lat, lon, precision)
 
     def _generate_sample_points(self, count: int = 50, center_lat: float = 39.9042,
                                   center_lon: float = 116.4074, radius: float = 0.05) -> list[dict[str, Any]]:
